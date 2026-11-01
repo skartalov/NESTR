@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: nestr
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
