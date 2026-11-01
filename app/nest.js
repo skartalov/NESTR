@@ -114,7 +114,7 @@
 
   // X/Y only. M21 = cutting head up, M20 = cutting head down.
   // G-code for a single sheet (index is 0-based).
-  function gcode(sheet, index, total, sameDir) {
+  function gcode(sheet, index, total, sameDir, feed) {
     const L = ['(NESTR)', '(Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
       '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
     if (sameDir) L.push('(Same direction cuts: left to right, bottom to top)');
@@ -126,7 +126,7 @@
         L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1));
       }
       if (!down) { L.push('M20'); down = true; }
-      L.push('G1 X' + fmt(g.x2) + ' Y' + fmt(g.y2));
+      L.push('G1 X' + fmt(g.x2) + ' Y' + fmt(g.y2) + ' F' + fmt(feed));
       cx = g.x2; cy = g.y2;
     }
     if (down) L.push('M21');

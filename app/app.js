@@ -115,10 +115,13 @@
     if (!sheets.length) return;
     const d = new Date(), p = n => String(n).padStart(2, '0');
     const sameDir = $('sameDir').checked;
+    const feed = parseFloat($('feed').value);
+    if (!(feed > 0)) { $('error').textContent = 'Enter a valid feedrate.'; return; }
+    $('error').textContent = '';
     const stamp = `NESTR_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
     // one file per sheet, staggered so the browser accepts multiple downloads
     sheets.forEach((s, i) => setTimeout(() => {
-      const blob = new Blob([Nestr.gcode(s, i, sheets.length, sameDir)], { type: 'text/plain' });
+      const blob = new Blob([Nestr.gcode(s, i, sheets.length, sameDir, feed)], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${stamp}_Sheet${i + 1}.txt`;
