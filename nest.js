@@ -1,60 +1,63 @@
-// Nesting engine: MaxRects (best short side fit), multi-sheet. No kerf.
+// Nesting engine: guillotine packing, multi-sheet. No kerf.
+// Every cut runs fully across the (sub)rectangle it divides, i.e. from one edge of the
+// sheet / an earlier cut to the opposite one, so tiles can be snapped by hand along it.
 (function (root) {
-  const EPS = 1e-9;
+  const EPS = 1e-6;
 
   class Bin {
-    constructor(w, h) {
+    constructor(w, h, splitMode) {
       this.w = w; this.h = h;
+      this.splitMode = splitMode; // 'H' | 'V' | 'auto'
       this.free = [{ x: 0, y: 0, w, h }];
       this.placed = [];
+      this.cuts = []; // {x1,y1,x2,y2}
     }
-    score(pw, ph) {
+    best(pw, ph) {
       let best = null;
-      for (const f of this.free) {
+      this.free.forEach((f, i) => {
         if (pw <= f.w + EPS && ph <= f.h + EPS) {
           const s1 = Math.min(f.w - pw, f.h - ph);
           const s2 = Math.max(f.w - pw, f.h - ph);
-          if (!best || s1 < best.s1 || (s1 === best.s1 && s2 < best.s2)) best = { s1, s2, x: f.x, y: f.y };
+          if (!best || s1 < best.s1 - EPS || (Math.abs(s1 - best.s1) <= EPS && s2 < best.s2)) best = { s1, s2, i };
         }
-      }
+      });
       return best;
     }
-    place(x, y, w, h, rotated) {
-      this.placed.push({ x, y, w, h, rotated });
-      const next = [];
-      for (const f of this.free) {
-        if (x >= f.x + f.w - EPS || x + w <= f.x + EPS || y >= f.y + f.h - EPS || y + h <= f.y + EPS) {
-          next.push(f); continue;
-        }
-        if (x > f.x + EPS) next.push({ x: f.x, y: f.y, w: x - f.x, h: f.h });
-        if (x + w < f.x + f.w - EPS) next.push({ x: x + w, y: f.y, w: f.x + f.w - x - w, h: f.h });
-        if (y > f.y + EPS) next.push({ x: f.x, y: f.y, w: f.w, h: y - f.y });
-        if (y + h < f.y + f.h - EPS) next.push({ x: f.x, y: y + h, w: f.w, h: f.y + f.h - y - h });
+    place(i, pw, ph, rotated) {
+      const f = this.free.splice(i, 1)[0];
+      this.placed.push({ x: f.x, y: f.y, w: pw, h: ph, rotated });
+      const rw = f.w - pw, rh = f.h - ph;
+      const hasR = rw > EPS, hasT = rh > EPS;
+      const mode = this.splitMode === 'auto' ? (rw < rh ? 'H' : 'V') : this.splitMode;
+      const cut = (x1, y1, x2, y2) => this.cuts.push({ x1, y1, x2, y2 });
+      if (mode === 'H') {
+        // full-width horizontal cut first, then a vertical cut inside the lower strip
+        if (hasT) { cut(f.x, f.y + ph, f.x + f.w, f.y + ph); this.free.push({ x: f.x, y: f.y + ph, w: f.w, h: rh }); }
+        if (hasR) { cut(f.x + pw, f.y, f.x + pw, f.y + ph); this.free.push({ x: f.x + pw, y: f.y, w: rw, h: ph }); }
+      } else {
+        // full-height vertical cut first, then a horizontal cut inside the left strip
+        if (hasR) { cut(f.x + pw, f.y, f.x + pw, f.y + f.h); this.free.push({ x: f.x + pw, y: f.y, w: rw, h: f.h }); }
+        if (hasT) { cut(f.x, f.y + ph, f.x + pw, f.y + ph); this.free.push({ x: f.x, y: f.y + ph, w: pw, h: rh }); }
       }
-      // drop rectangles contained in another (keep one of exact duplicates)
-      const inside = (a, b) => a.x >= b.x - EPS && a.y >= b.y - EPS && a.x + a.w <= b.x + b.w + EPS && a.y + a.h <= b.y + b.h + EPS;
-      this.free = next.filter((a, i) => !next.some((b, j) => i !== j && inside(a, b) && (!inside(b, a) || j < i)));
     }
     tryPlace(piece, allowRotate) {
-      const a = this.score(piece.w, piece.h);
-      const b = allowRotate && piece.w !== piece.h ? this.score(piece.h, piece.w) : null;
-      let pick = null, rot = false;
-      if (a && (!b || a.s1 < b.s1 || (a.s1 === b.s1 && a.s2 <= b.s2))) pick = a;
-      else if (b) { pick = b; rot = true; }
-      if (!pick) return false;
-      this.place(pick.x, pick.y, rot ? piece.h : piece.w, rot ? piece.w : piece.h, rot);
+      const a = this.best(piece.w, piece.h);
+      const b = allowRotate && piece.w !== piece.h ? this.best(piece.h, piece.w) : null;
+      if (a && (!b || a.s1 < b.s1 - EPS || (Math.abs(a.s1 - b.s1) <= EPS && a.s2 <= b.s2))) this.place(a.i, piece.w, piece.h, false);
+      else if (b) this.place(b.i, piece.h, piece.w, true);
+      else return false;
       return true;
     }
   }
 
-  function run(stockW, stockH, pieces, allowRotate, sortFn) {
+  function run(stockW, stockH, pieces, allowRotate, sortFn, splitMode) {
     const list = pieces.slice().sort(sortFn);
     const bins = [];
     for (const p of list) {
       let ok = false;
       for (const b of bins) if (b.tryPlace(p, allowRotate)) { ok = true; break; }
       if (!ok) {
-        const b = new Bin(stockW, stockH);
+        const b = new Bin(stockW, stockH, splitMode);
         if (!b.tryPlace(p, allowRotate)) throw new Error('Piece ' + p.w + ' x ' + p.h + ' does not fit on the stock tile.');
         bins.push(b);
       }
@@ -62,7 +65,8 @@
     return bins;
   }
 
-  // pieces: [{w,h}] already expanded by quantity. Returns [{w,h,placed:[{x,y,w,h,rotated}]}]
+  // pieces: [{w,h}] already expanded by quantity.
+  // Returns [{w,h,placed:[{x,y,w,h,rotated}],cuts:[{x1,y1,x2,y2}]}]
   function nest(stockW, stockH, pieces, allowRotate) {
     const sorts = [
       (a, b) => b.w * b.h - a.w * a.h,
@@ -72,47 +76,18 @@
       (a, b) => Math.min(b.w, b.h) - Math.min(a.w, a.h) || b.w * b.h - a.w * a.h,
     ];
     let best = null, bestLast = 0;
-    for (const s of sorts) {
-      const bins = run(stockW, stockH, pieces, allowRotate, s);
+    for (const s of sorts) for (const m of ['auto', 'H', 'V']) {
+      const bins = run(stockW, stockH, pieces, allowRotate, s, m);
       // fewer sheets first; then emptier last sheet (bigger reusable offcut)
       const last = bins[bins.length - 1].placed.reduce((t, p) => t + p.w * p.h, 0);
       if (!best || bins.length < best.length || (bins.length === best.length && last < bestLast)) { best = bins; bestLast = last; }
     }
-    return best.map(b => ({ w: b.w, h: b.h, placed: b.placed }));
+    return best.map(b => ({ w: b.w, h: b.h, placed: b.placed, cuts: b.cuts }));
   }
 
-  // Unique cut segments for one sheet: shared edges cut once, stock border skipped.
+  // Cuts ordered by nearest neighbour, entering each cut from its closer end.
   function cutPaths(sheet) {
-    const eps = 1e-6;
-    const H = new Map(), V = new Map();
-    const add = (map, key, a, b) => {
-      const k = Math.round(key * 1e4) / 1e4;
-      if (!map.has(k)) map.set(k, []);
-      map.get(k).push([a, b]);
-    };
-    for (const p of sheet.placed) {
-      add(H, p.y, p.x, p.x + p.w); add(H, p.y + p.h, p.x, p.x + p.w);
-      add(V, p.x, p.y, p.y + p.h); add(V, p.x + p.w, p.y, p.y + p.h);
-    }
-    const merge = iv => {
-      iv.sort((a, b) => a[0] - b[0]);
-      const out = [];
-      for (const s of iv) {
-        const l = out[out.length - 1];
-        if (l && s[0] <= l[1] + eps) l[1] = Math.max(l[1], s[1]); else out.push([s[0], s[1]]);
-      }
-      return out;
-    };
-    const segs = [];
-    for (const [y, iv] of H) {
-      if (y < eps || Math.abs(y - sheet.h) < eps) continue;
-      for (const [a, b] of merge(iv)) segs.push({ x1: a, y1: y, x2: b, y2: y });
-    }
-    for (const [x, iv] of V) {
-      if (x < eps || Math.abs(x - sheet.w) < eps) continue;
-      for (const [a, b] of merge(iv)) segs.push({ x1: x, y1: a, x2: x, y2: b });
-    }
-    // nearest-neighbour ordering, entering each segment from its closer end
+    const segs = sheet.cuts.map(c => ({ ...c }));
     const out = [];
     let cx = 0, cy = 0;
     while (segs.length) {
@@ -138,7 +113,7 @@
       L.push('', '; ---- Sheet ' + (i + 1) + ' of ' + sheets.length + ' (' + fmt(s.w) + ' x ' + fmt(s.h) + '), X0 Y0 = bottom-left ----');
       let cx = null, cy = null, down = false;
       for (const g of cutPaths(s)) {
-        if (cx !== g.x1 || cy !== g.y1) {
+        if (cx === null || Math.abs(cx - g.x1) > EPS || Math.abs(cy - g.y1) > EPS) {
           if (down) { L.push('M21'); down = false; }
           L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1));
         }
