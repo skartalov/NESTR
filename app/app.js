@@ -131,6 +131,5 @@
 
   $('addRow').onclick = () => addRow();
   $('logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
-  addRow(300, 300, 4);
-  addRow(250, 450, 3);
+  addRow();
 })();
