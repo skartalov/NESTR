@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NESTR – Admin</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><h1>NESTR <span>administration</span></h1></header>
+<main>
+  <div class="actions" style="margin:0 0 16px">
+    <a href="/app/"><button type="button">Open NESTR</button></a>
+    <button id="logout" type="button" class="secondary">Log out</button>
+  </div>
+
+  <section class="panel">
+    <h2>Access codes</h2>
+    <table id="codes">
+      <thead><tr><th>Name</th><th>Created</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="empty" class="hint">No user access codes yet.</p>
+    <h2>Add access code</h2>
+    <div class="row">
+      <label>Name <input id="newLabel" type="text" maxlength="60" style="width:200px;padding:6px"></label>
+      <label>Code <input id="newCode" type="text" maxlength="100" autocomplete="off" style="width:200px;padding:6px"></label>
+    </div>
+    <div class="actions">
+      <button id="gen" type="button" class="secondary">Generate code</button>
+      <button id="add" type="button">Add</button>
+    </div>
+    <div id="addMsg" class="error"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Change administrator code</h2>
+    <div class="row">
+      <label>Current code <input id="curPw" type="password" autocomplete="current-password" style="width:200px;padding:6px"></label>
+      <label>New code (min 8) <input id="newPw" type="password" autocomplete="new-password" style="width:200px;padding:6px"></label>
+    </div>
+    <div class="actions"><button id="chg" type="button">Change</button></div>
+    <div id="pwMsg" class="error"></div>
+  </section>
+</main>
+<script src="admin.js"></script>
+</body>
+</html>

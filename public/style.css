@@ -1,6 +1,6 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #eef1f5; color: #1c2430; }
-header { background: #1f3a5f; color: #fff; padding: 14px 24px; }
+header { background: #1f3a5f; color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
 header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
 header h1 span { font-size: 13px; font-weight: normal; letter-spacing: 0; opacity: .8; margin-left: 12px; }
 main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }

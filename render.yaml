@@ -1,6 +1,9 @@
 services:
   - type: web
     name: nestr
-    runtime: static
-    staticPublishPath: .
+    runtime: node
     buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: ADMIN_CODE
+        sync: false
