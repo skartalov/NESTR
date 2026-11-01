@@ -109,8 +109,8 @@
   // X/Y only. M21 = cutting head up, M20 = cutting head down.
   // G-code for a single sheet (index is 0-based).
   function gcode(sheet, index, total) {
-    const L = ['; NESTR', '; Sheet ' + (index + 1) + ' of ' + total + ' (' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
-      '; Units: mm, absolute positioning, X0 Y0 = bottom-left', 'G21', 'G90', 'M21'];
+    const L = ['{NESTR}', '{Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm}',
+      '{Units mm, absolute positioning, X0 Y0 = bottom-left}', 'G21', 'G90', 'M21'];
     let cx = null, cy = null, down = false;
     for (const g of cutPaths(sheet)) {
       if (cx === null || Math.abs(cx - g.x1) > EPS || Math.abs(cy - g.y1) > EPS) {
@@ -122,7 +122,7 @@
       cx = g.x2; cy = g.y2;
     }
     if (down) L.push('M21');
-    L.push('G0 X0 Y0', '; END');
+    L.push('G0 X0 Y0', '{END}');
     return L.join('\r\n') + '\r\n';
   }
 
