@@ -85,9 +85,15 @@
     return best.map(b => ({ w: b.w, h: b.h, placed: b.placed, cuts: b.cuts }));
   }
 
-  // Cuts ordered by nearest neighbour, entering each cut from its closer end.
-  function cutPaths(sheet) {
-    const segs = sheet.cuts.map(c => ({ ...c }));
+  // Cuts ordered by nearest neighbour. Normally each cut is entered from its closer end;
+  // with sameDir every cut runs left to right / bottom to top.
+  function cutPaths(sheet, sameDir) {
+    const segs = sheet.cuts.map(c => {
+      if (!sameDir) return { ...c };
+      const horiz = Math.abs(c.y1 - c.y2) < EPS;
+      const rev = horiz ? c.x1 > c.x2 : c.y1 > c.y2;
+      return rev ? { x1: c.x2, y1: c.y2, x2: c.x1, y2: c.y1 } : { ...c };
+    });
     const out = [];
     let cx = 0, cy = 0;
     while (segs.length) {
@@ -95,7 +101,7 @@
       segs.forEach((s, i) => {
         const d1 = Math.hypot(s.x1 - cx, s.y1 - cy), d2 = Math.hypot(s.x2 - cx, s.y2 - cy);
         if (d1 < bd) { bd = d1; bi = i; flip = false; }
-        if (d2 < bd) { bd = d2; bi = i; flip = true; }
+        if (!sameDir && d2 < bd) { bd = d2; bi = i; flip = true; }
       });
       const s = segs.splice(bi, 1)[0];
       const seg = flip ? { x1: s.x2, y1: s.y2, x2: s.x1, y2: s.y1 } : s;
@@ -108,11 +114,13 @@
 
   // X/Y only. M21 = cutting head up, M20 = cutting head down.
   // G-code for a single sheet (index is 0-based).
-  function gcode(sheet, index, total) {
+  function gcode(sheet, index, total, sameDir) {
     const L = ['(NESTR)', '(Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
-      '(Units mm, absolute positioning, X0 Y0 = bottom-left)', 'G21', 'G90', 'M21'];
+      '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
+    if (sameDir) L.push('(Same direction cuts: left to right, bottom to top)');
+    L.push('G21', 'G90', 'M21');
     let cx = null, cy = null, down = false;
-    for (const g of cutPaths(sheet)) {
+    for (const g of cutPaths(sheet, sameDir)) {
       if (cx === null || Math.abs(cx - g.x1) > EPS || Math.abs(cy - g.y1) > EPS) {
         if (down) { L.push('M21'); down = false; }
         L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1));
