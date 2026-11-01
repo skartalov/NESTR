@@ -3,6 +3,7 @@
 Web app for nesting rectangular ceramic tile pieces on stock tiles cut by a CNC knife (no kerf).
 
 - Enter stock tile size and the pieces (width, height, qty).
+- Optional **Notes** per piece row (e.g. room name), shown inside the tiles and in a list under each sheet, also in the PDF.
 - Option **Respect pattern direction**: when off, pieces may be rotated 90°.
 - Automatically continues on new stock tiles when one is not enough.
 - Graphical sheets with dimensions on every piece; **Print / Save as PDF**.

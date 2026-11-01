@@ -23,9 +23,9 @@
       });
       return best;
     }
-    place(i, pw, ph, rotated) {
+    place(i, pw, ph, rotated, note) {
       const f = this.free.splice(i, 1)[0];
-      this.placed.push({ x: f.x, y: f.y, w: pw, h: ph, rotated });
+      this.placed.push({ x: f.x, y: f.y, w: pw, h: ph, rotated, note: note || '' });
       const rw = f.w - pw, rh = f.h - ph;
       const hasR = rw > EPS, hasT = rh > EPS;
       const mode = this.splitMode === 'auto' ? (rw < rh ? 'H' : 'V') : this.splitMode;
@@ -43,8 +43,8 @@
     tryPlace(piece, allowRotate) {
       const a = this.best(piece.w, piece.h);
       const b = allowRotate && piece.w !== piece.h ? this.best(piece.h, piece.w) : null;
-      if (a && (!b || a.s1 < b.s1 - EPS || (Math.abs(a.s1 - b.s1) <= EPS && a.s2 <= b.s2))) this.place(a.i, piece.w, piece.h, false);
-      else if (b) this.place(b.i, piece.h, piece.w, true);
+      if (a && (!b || a.s1 < b.s1 - EPS || (Math.abs(a.s1 - b.s1) <= EPS && a.s2 <= b.s2))) this.place(a.i, piece.w, piece.h, false, piece.note);
+      else if (b) this.place(b.i, piece.h, piece.w, true, piece.note);
       else return false;
       return true;
     }

@@ -3,13 +3,15 @@
   const tbody = document.querySelector('#pieces tbody');
   let sheets = [];
 
-  function addRow(w = '', h = '', q = 1) {
+  function addRow(w = '', h = '', q = 1, note = '') {
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td><input type="number" min="0.1" step="any" class="pw"></td>' +
       '<td><input type="number" min="0.1" step="any" class="ph"></td>' +
       '<td><input type="number" min="1" step="1" class="pq"></td>' +
+      '<td><input type="text" maxlength="40" class="pn" placeholder="e.g. Kitchen"></td>' +
       '<td><button type="button" class="del" title="Remove">✕</button></td>';
+    tr.querySelector('.pn').value = note;
     tr.querySelector('.pw').value = w;
     tr.querySelector('.ph').value = h;
     tr.querySelector('.pq').value = q;
@@ -18,6 +20,7 @@
   }
 
   const fmt = n => String(Math.round(n * 100) / 100);
+  const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   function readInput() {
     const sw = parseFloat($('stockW').value), sh = parseFloat($('stockH').value);
@@ -29,7 +32,8 @@
       const q = parseInt(tr.querySelector('.pq').value, 10);
       if (!tr.querySelector('.pw').value && !tr.querySelector('.ph').value) return;
       if (!(w > 0) || !(h > 0) || !(q > 0)) throw new Error('Every piece needs width, height and quantity greater than 0.');
-      for (let i = 0; i < q; i++) pieces.push({ w, h });
+      const note = tr.querySelector('.pn').value.trim();
+      for (let i = 0; i < q; i++) pieces.push({ w, h, note });
     });
     if (!pieces.length) throw new Error('Add at least one piece.');
     if (pieces.length > 5000) throw new Error('Too many pieces (max 5000).');
@@ -48,7 +52,13 @@
       const y = sheet.h - p.y - p.h;
       const fs = Math.min(p.w / (fmt(p.w).length + fmt(p.h).length + 3) * 1.6, p.h / 2.2, Math.max(sheet.w, sheet.h) / 30);
       html += `<rect x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" fill="${p.rotated ? '#bcd7f5' : '#cfe8c9'}" stroke="#1c2430" stroke-width="${sw}"/>`;
-      html += `<text x="${p.x + p.w / 2}" y="${y + p.h / 2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" font-family="Arial" fill="#111">${fmt(p.w)} × ${fmt(p.h)}${p.rotated ? ' ↻' : ''}</text>`;
+      const cx = p.x + p.w / 2, cy = y + p.h / 2;
+      const dy = p.note ? fs * 0.65 : 0;
+      html += `<text x="${cx}" y="${cy - dy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" font-family="Arial" fill="#111">${fmt(p.w)} × ${fmt(p.h)}${p.rotated ? ' ↻' : ''}</text>`;
+      if (p.note) {
+        const nfs = Math.min(fs, p.w / (p.note.length * 0.6 + 1));
+        html += `<text x="${cx}" y="${cy + dy}" font-size="${nfs}" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-style="italic" fill="#7a1f00">${esc(p.note)}</text>`;
+      }
     }
     svg.innerHTML = html;
     return svg;
@@ -69,6 +79,18 @@
       const u = s.placed.reduce((a, p) => a + p.w * p.h, 0) / stockArea * 100;
       div.innerHTML = `<h3>Sheet ${i + 1} of ${total} — ${s.placed.length} pieces, ${u.toFixed(1)}% used</h3>`;
       div.appendChild(svgFor(s));
+      // legend so notes stay readable even on tiles too small for text
+      const counts = new Map();
+      s.placed.filter(p => p.note).forEach(p => {
+        const k = `${p.note} — ${fmt(p.w)} × ${fmt(p.h)}`;
+        counts.set(k, (counts.get(k) || 0) + 1);
+      });
+      if (counts.size) {
+        const ul = document.createElement('ul');
+        ul.className = 'notes';
+        counts.forEach((n, k) => { const li = document.createElement('li'); li.textContent = `${k} (×${n})`; ul.appendChild(li); });
+        div.appendChild(ul);
+      }
       box.appendChild(div);
     });
     $('result').classList.remove('hidden');
@@ -107,6 +129,6 @@
   };
 
   $('addRow').onclick = () => addRow();
-  addRow(300, 300, 4);
+  addRow(300, 300, 4, 'Kitchen');
   addRow(250, 450, 3);
 })();
