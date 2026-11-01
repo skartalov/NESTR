@@ -129,6 +129,6 @@
   };
 
   $('addRow').onclick = () => addRow();
-  addRow(300, 300, 4, 'Kitchen');
+  addRow(300, 300, 4);
   addRow(250, 450, 3);
 })();
