@@ -92,15 +92,18 @@
   $('gcodeBtn').onclick = () => {
     if (!sheets.length) return;
     const d = new Date(), p = n => String(n).padStart(2, '0');
-    const name = `NESTR_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.txt`;
-    const blob = new Blob([Nestr.gcode(sheets)], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    const stamp = `NESTR_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    // one file per sheet, staggered so the browser accepts multiple downloads
+    sheets.forEach((s, i) => setTimeout(() => {
+      const blob = new Blob([Nestr.gcode(s, i, sheets.length)], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${stamp}_Sheet${i + 1}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }, i * 400));
   };
 
   $('addRow').onclick = () => addRow();
