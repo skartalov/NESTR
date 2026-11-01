@@ -13,11 +13,12 @@ Web app for nesting rectangular ceramic tile pieces on stock tiles cut by a CNC 
 ## Access control
 The app is protected by access codes (Node server, no dependencies).
 - `/login` asks for a code. The administrator code opens `/admin/` (add/remove user codes, change the administrator code, open the app); user codes open `/app/`.
-- Codes are stored hashed (scrypt) in `DATA_DIR/codes.json` (default `./data`, git-ignored). Sessions are HttpOnly cookies; login is rate limited.
-- On the very first start the administrator code is taken from the `ADMIN_CODE` environment variable (a random one is printed to the log if unset). After that the code stored in `codes.json` is used, and changing it in the admin page overrides the variable.
+- Codes are stored hashed (scrypt). Sessions are HttpOnly cookies; login is rate limited.
+- Storage: if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, codes are kept in a free Upstash Redis database (survives restarts/redeploys). Otherwise they are kept in `DATA_DIR/codes.json` (default `./data`, git-ignored), which is lost on Render's free tier.
+- On the very first start the administrator code is taken from `ADMIN_CODE` (a random one is printed to the log if unset). After that the stored code is used; changing it in the admin page overrides the variable.
 
-Run locally: `ADMIN_CODE=yourcode node server.js` → http://localhost:3000
+Run locally: `ADMIN_CODE=yourcode node server.js` -> http://localhost:3000
 
 ## Deploy (Render)
-Render → New → **Web Service** → connect this repo, runtime Node, build command empty, start command `node server.js`, environment variable `ADMIN_CODE` (see `render.yaml`).
-Render's free disk is ephemeral: user codes and an admin-code change are lost on restart/redeploy (the admin code then reverts to `ADMIN_CODE`). To keep them, attach a Render Disk, e.g. mounted at `/var/data`, and set `DATA_DIR=/var/data`.
+New -> **Web Service**, connect this repo, runtime Node, build command `npm install`, start command `node server.js`.
+Environment variables: `ADMIN_CODE`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.

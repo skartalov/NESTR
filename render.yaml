@@ -2,8 +2,12 @@ services:
   - type: web
     name: nestr
     runtime: node
-    buildCommand: ""
+    buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: ADMIN_CODE
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
         sync: false

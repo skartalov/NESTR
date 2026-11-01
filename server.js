@@ -20,23 +20,42 @@ const matches = (code, e) => {
 };
 
 let db;
-function load() {
-  try { db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); return; } catch (e) { /* first run */ }
+const REMOTE_URL = process.env.UPSTASH_REDIS_REST_URL;
+const REMOTE_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const REMOTE_KEY = 'nestr:db';
+
+async function redis(cmd) {
+  const r = await fetch(REMOTE_URL, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + REMOTE_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cmd),
+  });
+  const d = await r.json();
+  if (!r.ok || d.error) throw new Error('Database error: ' + (d.error || r.status));
+  return d.result;
+}
+
+async function load() {
+  let raw = null;
+  if (REMOTE_URL && REMOTE_TOKEN) raw = await redis(['GET', REMOTE_KEY]);
+  else { try { raw = fs.readFileSync(DATA_FILE, 'utf8'); } catch (e) { /* first run */ } }
+  if (raw) { db = JSON.parse(raw); return; }
   let admin = process.env.ADMIN_CODE;
   if (!admin) {
     admin = crypto.randomBytes(9).toString('base64url');
     console.log('ADMIN_CODE not set. Temporary admin access code: ' + admin);
   }
   db = { admin: makeEntry(admin), codes: [] };
-  save();
+  await save();
 }
-function save() {
+async function save() {
+  const text = JSON.stringify(db, null, 2);
+  if (REMOTE_URL && REMOTE_TOKEN) return void await redis(['SET', REMOTE_KEY, text]);
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  fs.writeFileSync(tmp, text);
   fs.renameSync(tmp, DATA_FILE);
 }
-load();
 
 // ---------- sessions ----------
 const sessions = new Map(); // token -> { role, codeId, exp }
@@ -164,7 +183,7 @@ async function handle(req, res) {
     if (code.length < 6 || code.length > 100) return json(res, 400, { error: 'Code must be 6-100 characters' });
     if (matches(code, db.admin) || db.codes.some(c => matches(code, c))) return json(res, 409, { error: 'That code is already in use' });
     db.codes.push({ id: crypto.randomBytes(6).toString('hex'), label, created: new Date().toISOString(), ...makeEntry(code) });
-    save();
+    await save();
     return json(res, 200, { ok: true });
   }
   const del = p.match(/^\/api\/admin\/codes\/([a-f0-9]+)$/);
@@ -172,7 +191,7 @@ async function handle(req, res) {
     const before = db.codes.length;
     db.codes = db.codes.filter(c => c.id !== del[1]);
     if (db.codes.length === before) return json(res, 404, { error: 'Not found' });
-    save();
+    await save();
     dropSessions(s => s.codeId === del[1]);
     return json(res, 200, { ok: true });
   }
@@ -185,13 +204,15 @@ async function handle(req, res) {
     if (next.length < 8 || next.length > 100) return json(res, 400, { error: 'New admin code must be 8-100 characters' });
     if (db.codes.some(c => matches(next, c))) return json(res, 409, { error: 'That code is already used as a user code' });
     db.admin = makeEntry(next);
-    save();
+    await save();
     dropSessions(s => s.role === 'admin', sess.token);
     return json(res, 200, { ok: true });
   }
   return send(res, 404, 'Not found');
 }
 
-http.createServer((req, res) => {
-  handle(req, res).catch(e => { console.error(e); if (!res.headersSent) json(res, 500, { error: 'Server error' }); });
-}).listen(PORT, () => console.log('NESTR listening on ' + PORT));
+load().then(() => {
+  http.createServer((req, res) => {
+    handle(req, res).catch(e => { console.error(e); if (!res.headersSent) json(res, 500, { error: 'Server error' }); });
+  }).listen(PORT, () => console.log('NESTR listening on ' + PORT + (REMOTE_URL ? ' (Redis storage)' : ' (file storage)')));
+}).catch(e => { console.error('Startup failed:', e.message); process.exit(1); });
