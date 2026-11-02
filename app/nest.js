@@ -145,7 +145,7 @@
       // exactly one G1 between M20 and M21
       L.push('M20', 'G1 X' + fmt(g.x2) + ' Y' + fmt(g.y2) + ' F' + fmt(feed), 'M21');
     }
-    L.push('G0 X0 Y0 A0', '(END)');
+    L.push('G0 X0 Y0 A0', 'M30');
     return L.join('\r\n') + '\r\n';
   }
 
