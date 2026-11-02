@@ -64,5 +64,17 @@
   };
 
   $('logout').onclick = async () => { await api('POST', '/api/logout'); location.href = '/login'; };
+  api('GET', '/api/admin/storage').then(s => {
+    const b = $('storage');
+    b.style.display = '';
+    if (s.persistent) {
+      b.style.borderLeft = '5px solid #1a7f37';
+      b.textContent = 'Storage: permanent database (Upstash Redis). Codes are kept.';
+    } else {
+      b.style.borderLeft = '5px solid #c0392b';
+      b.textContent = 'WARNING: temporary file storage. Codes and admin code changes are LOST when the server restarts. ' +
+        'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in the Render environment.';
+    }
+  });
   refresh();
 })();
