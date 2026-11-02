@@ -28,13 +28,8 @@
   <button id="addRow" type="button" class="secondary">+ Add piece</button>
 
   <div class="row">
-    <label>Feedrate (mm/min) <input id="feed" type="number" min="1" step="any" value="4000"></label>
+    <label>Feedrate (mm/min) <input id="feed" type="number" min="1" step="any" value="10000"></label>
   </div>
-  <label class="check"><input id="useA" type="checkbox" checked> A axis (orient the head to the cut direction)</label>
-  <div class="row">
-    <label>A offset (deg) <input id="aOffset" type="number" step="any" value="0"></label>
-  </div>
-  <p class="hint">A = direction of the next cut: +X = 0°, +Y = 90°, −X = 180°, −Y = 270° (plus the offset). Written in every G0 move.</p>
   <label class="check"><input id="sameDir" type="checkbox"> Same Direction Cuts</label>
   <p class="hint">G-code cuts always run left to right and bottom to top.</p>
 
