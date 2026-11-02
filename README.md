@@ -5,7 +5,7 @@ Web app for nesting rectangular ceramic tile pieces on stock tiles cut by a CNC 
 - Enter stock tile size and the pieces (width, height, qty).
 - Optional **Notes** per piece row (e.g. room name), shown inside the tiles and in a list under each sheet, also in the PDF.
 - Option **Same Direction Cuts**: G-code cuts always run left to right and bottom to top.
-- Option **Add A axis**: every G0 move carries `A` = direction of the next cut (+X 0°, +Y 90°, -X 180°, -Y 270°, plus an offset) to orient a tangential knife.
+- Option **A axis** (on by default): every G0 move carries `A` = direction of the next cut (+X 0°, +Y 90°, -X 180°, -Y 270°, plus an offset) to orient a tangential knife.
 - Option **Respect pattern direction**: when off, pieces may be rotated 90Â°.
 - Automatically continues on new stock tiles when one is not enough.
 - Graphical sheets with dimensions on every piece; **Print / Save as PDF**.
