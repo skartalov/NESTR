@@ -88,12 +88,27 @@
   // Cuts ordered by nearest neighbour. Normally each cut is entered from its closer end;
   // with sameDir every cut runs left to right / bottom to top.
   function cutPaths(sheet, sameDir) {
-    const segs = sheet.cuts.map(c => {
-      if (!sameDir) return { ...c };
+    // merge collinear cuts that touch or overlap into one continuous line
+    const groups = new Map();
+    for (const c of sheet.cuts) {
       const horiz = Math.abs(c.y1 - c.y2) < EPS;
-      const rev = horiz ? c.x1 > c.x2 : c.y1 > c.y2;
-      return rev ? { x1: c.x2, y1: c.y2, x2: c.x1, y2: c.y1 } : { ...c };
-    });
+      const key = (horiz ? 'H' : 'V') + Math.round((horiz ? c.y1 : c.x1) * 1e4);
+      const a = horiz ? Math.min(c.x1, c.x2) : Math.min(c.y1, c.y2);
+      const b = horiz ? Math.max(c.x1, c.x2) : Math.max(c.y1, c.y2);
+      if (!groups.has(key)) groups.set(key, { horiz, pos: horiz ? c.y1 : c.x1, iv: [] });
+      groups.get(key).iv.push([a, b]);
+    }
+    const merged = [];
+    for (const g of groups.values()) {
+      g.iv.sort((p, q) => p[0] - q[0]);
+      const m = [];
+      for (const s of g.iv) {
+        const l = m[m.length - 1];
+        if (l && s[0] <= l[1] + EPS) l[1] = Math.max(l[1], s[1]); else m.push([s[0], s[1]]);
+      }
+      for (const [a, b] of m) merged.push(g.horiz ? { x1: a, y1: g.pos, x2: b, y2: g.pos } : { x1: g.pos, y1: a, x2: g.pos, y2: b });
+    }
+    const segs = merged;
     const out = [];
     let cx = 0, cy = 0;
     while (segs.length) {
@@ -119,17 +134,15 @@
       '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
     if (sameDir) L.push('(Same direction cuts: left to right, bottom to top)');
     L.push('G21', 'G90', 'M21');
-    let cx = null, cy = null, down = false;
+    let cx = null, cy = null;
     for (const g of cutPaths(sheet, sameDir)) {
       if (cx === null || Math.abs(cx - g.x1) > EPS || Math.abs(cy - g.y1) > EPS) {
-        if (down) { L.push('M21'); down = false; }
         L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1));
       }
-      if (!down) { L.push('M20'); down = true; }
-      L.push('G1 X' + fmt(g.x2) + ' Y' + fmt(g.y2) + ' F' + fmt(feed));
+      // exactly one G1 between M20 and M21
+      L.push('M20', 'G1 X' + fmt(g.x2) + ' Y' + fmt(g.y2) + ' F' + fmt(feed), 'M21');
       cx = g.x2; cy = g.y2;
     }
-    if (down) L.push('M21');
     L.push('G0 X0 Y0', '(END)');
     return L.join('\r\n') + '\r\n';
   }
