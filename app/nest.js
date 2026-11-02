@@ -126,24 +126,31 @@
   }
 
   const fmt = n => String(Math.round(n * 1000) / 1000);
+  // angle in [0,360), snapped so 90/180/270 never come out as 89.9999
+  const norm = d => { let a = ((d % 360) + 360) % 360; a = Math.round(a * 1e6) / 1e6; return a >= 360 ? 0 : a; };
 
   // X/Y only. M21 = cutting head up, M20 = cutting head down.
   // G-code for a single sheet (index is 0-based).
-  function gcode(sheet, index, total, sameDir, feed) {
+  function gcode(sheet, index, total, sameDir, feed, aAxis) {
     const L = ['(NESTR)', '(Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
       '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
     if (sameDir) L.push('(Same direction cuts: left to right, bottom to top)');
+    if (aAxis) L.push('(A axis = cut direction in degrees: +X = ' + fmt(norm(aAxis.offset)) + ', +Y = ' + fmt(norm(90 + aAxis.offset)) + ')');
     L.push('G21', 'G90', 'M21');
+    // knife orientation for a cut: angle of its direction vector
+    const angle = g => norm(Math.atan2(g.y2 - g.y1, g.x2 - g.x1) * 180 / Math.PI + aAxis.offset);
+    const A = g => aAxis ? ' A' + fmt(angle(g)) : '';
     let cx = null, cy = null;
     for (const g of cutPaths(sheet, sameDir)) {
-      if (cx === null || Math.abs(cx - g.x1) > EPS || Math.abs(cy - g.y1) > EPS) {
-        L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1));
+      // the G0 is always written with A so the head is oriented before it goes down
+      if (cx === null || Math.abs(cx - g.x1) > EPS || Math.abs(cy - g.y1) > EPS || aAxis) {
+        L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1) + A(g));
       }
       // exactly one G1 between M20 and M21
       L.push('M20', 'G1 X' + fmt(g.x2) + ' Y' + fmt(g.y2) + ' F' + fmt(feed), 'M21');
       cx = g.x2; cy = g.y2;
     }
-    L.push('G0 X0 Y0', '(END)');
+    L.push('G0 X0 Y0' + (aAxis ? ' A' + fmt(norm(aAxis.offset)) : ''), '(END)');
     return L.join('\r\n') + '\r\n';
   }
 
