@@ -172,6 +172,9 @@ async function handle(req, res) {
   if (p === '/admin') return redirect(res, '/admin/');
   if (p.startsWith('/admin/')) return serveFile(res, ADM, p === '/admin/' ? 'admin.html' : p.slice(7));
 
+  if (p === '/api/admin/storage' && req.method === 'GET') {
+    return json(res, 200, { persistent: !!(REMOTE_URL && REMOTE_TOKEN), type: REMOTE_URL && REMOTE_TOKEN ? 'redis' : 'file' });
+  }
   if (p === '/api/admin/codes' && req.method === 'GET') {
     return json(res, 200, db.codes.map(c => ({ id: c.id, label: c.label, created: c.created })));
   }
