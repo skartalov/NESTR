@@ -98,7 +98,7 @@
 
   // Cuts ordered by nearest neighbour. Normally each cut is entered from its closer end;
   // with sameDir every cut runs right to left / top to bottom.
-  function cutPaths(sheet, sameDir) {
+  function cutPaths(sheet, sameDir, gap) {
     // merge collinear cuts that touch or overlap into one continuous line
     const groups = new Map();
     for (const c of sheet.cuts) {
@@ -118,6 +118,19 @@
         if (l && s[0] <= l[1] + EPS) l[1] = Math.max(l[1], s[1]); else m.push([s[0], s[1]]);
       }
       for (const [a, b] of m) merged.push(g.horiz ? { x1: a, y1: g.pos, x2: b, y2: g.pos } : { x1: g.pos, y1: a, x2: g.pos, y2: b });
+    }
+    // every merged cut ends at the sheet border or at a perpendicular cut: stop `gap` short of it
+    // at both ends so a small uncut bridge remains. Cuts too short for that are skipped.
+    if (gap > 0) {
+      const trimmed = [];
+      for (const s of merged) {
+        const horiz = Math.abs(s.y1 - s.y2) < EPS;
+        const len = horiz ? s.x2 - s.x1 : s.y2 - s.y1;
+        if (len <= 2 * gap + EPS) continue;
+        trimmed.push(horiz ? { x1: s.x1 + gap, y1: s.y1, x2: s.x2 - gap, y2: s.y2 } : { x1: s.x1, y1: s.y1 + gap, x2: s.x2, y2: s.y2 - gap });
+      }
+      merged.length = 0;
+      merged.push(...trimmed);
     }
     // merged segments run left to right / bottom to top; same-direction mode reverses them
     const segs = sameDir ? merged.map(s => ({ x1: s.x2, y1: s.y2, x2: s.x1, y2: s.y1 })) : merged;
@@ -143,15 +156,16 @@
 
   // X/Y only. M21 = cutting head up, M20 = cutting head down.
   // G-code for a single sheet (index is 0-based).
-  function gcode(sheet, index, total, sameDir, feed) {
+  function gcode(sheet, index, total, sameDir, feed, gap) {
     const L = ['(NESTR)', '(Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
       '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
     if (sameDir) L.push('(Same direction cuts: right to left, top to bottom)');
+    if (gap > 0) L.push('(Gap: cuts stop ' + fmt(gap) + ' mm short of the sheet border and of crossing cuts)');
     L.push('(A axis = direction of the next cut: +X = 0, +Y = 90, -X = 180, -Y = 270)');
     L.push('G21', 'G90', 'M21');
     // head orientation for a cut: angle of its direction vector
     const angle = g => norm(Math.atan2(g.y2 - g.y1, g.x2 - g.x1) * 180 / Math.PI);
-    for (const g of cutPaths(sheet, sameDir)) {
+    for (const g of cutPaths(sheet, sameDir, gap)) {
       // G0 always carries A so the head is oriented before it goes down
       L.push('G0 X' + fmt(g.x1) + ' Y' + fmt(g.y1) + ' A' + fmt(angle(g)));
       // exactly one G1 between M20 and M21

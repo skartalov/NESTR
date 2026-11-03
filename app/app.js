@@ -119,11 +119,13 @@
     const sameDir = $('sameDir').checked;
     const feed = parseFloat($('feed').value);
     if (!(feed > 0)) { $('error').textContent = 'Enter a valid feedrate.'; return; }
+    const gap = parseFloat($('gap').value) || 0;
+    if (gap < 0) { $('error').textContent = 'Gap cannot be negative.'; return; }
     $('error').textContent = '';
     const stamp = `NESTR_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
     // one file per sheet, staggered so the browser accepts multiple downloads
     sheets.forEach((s, i) => setTimeout(() => {
-      const blob = new Blob([Nestr.gcode(s, i, sheets.length, sameDir, feed)], { type: 'text/plain' });
+      const blob = new Blob([Nestr.gcode(s, i, sheets.length, sameDir, feed, gap)], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${stamp}_Sheet${i + 1}.txt`;
@@ -146,7 +148,7 @@
   });
   $('logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
   // Remember stock size and the two checkboxes in a cookie (1 year)
-  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir', 'feed', 'allowance'];
+  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir', 'feed', 'allowance', 'gap'];
   try {
     const m = document.cookie.match(/(?:^|;\s*)nestr_settings=([^;]*)/);
     const data = m ? JSON.parse(decodeURIComponent(m[1])) : {};

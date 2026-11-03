@@ -146,12 +146,14 @@
     var sameDir = $('sameDir').checked;
     var feed = parseFloat($('feed').value);
     if (!(feed > 0)) { $('error').innerHTML = 'Enter a valid feedrate.'; return; }
+    var gap = parseFloat($('gap').value) || 0;
+    if (gap < 0) { $('error').innerHTML = 'Gap cannot be negative.'; return; }
     $('error').innerHTML = '';
     var stamp = 'NESTR_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes());
     // one file per sheet, staggered so the browser accepts multiple downloads
     sheets.forEach(function (s, i) {
       setTimeout(function () {
-        download(stamp + '_Sheet' + (i + 1) + '.txt', Nestr.gcode(s, i, sheets.length, sameDir, feed));
+        download(stamp + '_Sheet' + (i + 1) + '.txt', Nestr.gcode(s, i, sheets.length, sameDir, feed, gap));
       }, i * 400);
     });
   };
@@ -172,7 +174,7 @@
 
   // Remember stock size and the two checkboxes. localStorage first (cookies are
   // often not kept for file:// pages), cookie as a fallback.
-  var SAVED = ['stockW', 'stockH',   'respectDir', 'sameDir', 'feed', 'allowance'];
+  var SAVED = ['stockW', 'stockH',   'respectDir', 'sameDir', 'feed', 'allowance', 'gap'];
   function loadSettings() {
     var data = null;
     try { data = JSON.parse(localStorage.getItem('nestr_settings')); } catch (e) {}

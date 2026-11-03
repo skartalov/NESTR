@@ -95,7 +95,7 @@
   }
 
   // Cuts ordered by nearest neighbour; with sameDir every cut runs right to left / top to bottom.
-  function cutPaths(sheet, sameDir) {
+  function cutPaths(sheet, sameDir, gap) {
     var groups = {}, order = [], i, j;
     for (i = 0; i < sheet.cuts.length; i++) {
       var c = sheet.cuts[i];
@@ -116,6 +116,18 @@
         if (l && s[0] <= l[1] + EPS) l[1] = Math.max(l[1], s[1]); else m.push([s[0], s[1]]);
       }
       for (j = 0; j < m.length; j++) merged.push(g.horiz ? { x1: m[j][0], y1: g.pos, x2: m[j][1], y2: g.pos } : { x1: g.pos, y1: m[j][0], x2: g.pos, y2: m[j][1] });
+    }
+    // every merged cut ends at the sheet border or at a perpendicular cut: stop `gap` short of it
+    // at both ends so a small uncut bridge remains. Cuts too short for that are skipped.
+    if (gap > 0) {
+      var trimmed = [];
+      for (i = 0; i < merged.length; i++) {
+        var u = merged[i], uh = Math.abs(u.y1 - u.y2) < EPS;
+        var len = uh ? u.x2 - u.x1 : u.y2 - u.y1;
+        if (len <= 2 * gap + EPS) continue;
+        trimmed.push(uh ? { x1: u.x1 + gap, y1: u.y1, x2: u.x2 - gap, y2: u.y2 } : { x1: u.x1, y1: u.y1 + gap, x2: u.x2, y2: u.y2 - gap });
+      }
+      merged = trimmed;
     }
     var segs = [];
     for (i = 0; i < merged.length; i++) {
@@ -143,13 +155,14 @@
   function norm(d) { var a = ((d % 360) + 360) % 360; a = Math.round(a * 1e6) / 1e6; return a >= 360 ? 0 : a; }
 
   // X/Y/A. M21 = cutting head up, M20 = cutting head down. One sheet (index is 0-based).
-  function gcode(sheet, index, total, sameDir, feed) {
+  function gcode(sheet, index, total, sameDir, feed, gap) {
     var L = ['(NESTR)', '(Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
       '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
     if (sameDir) L.push('(Same direction cuts: right to left, top to bottom)');
+    if (gap > 0) L.push('(Gap: cuts stop ' + fmt(gap) + ' mm short of the sheet border and of crossing cuts)');
     L.push('(A axis = direction of the next cut: +X = 0, +Y = 90, -X = 180, -Y = 270)');
     L.push('G21', 'G90', 'M21');
-    var paths = cutPaths(sheet, sameDir);
+    var paths = cutPaths(sheet, sameDir, gap);
     for (var i = 0; i < paths.length; i++) {
       var g = paths[i];
       var ang = norm(Math.atan2(g.y2 - g.y1, g.x2 - g.x1) * 180 / Math.PI);
