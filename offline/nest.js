@@ -3,18 +3,29 @@
 (function (root) {
   var EPS = 1e-6;
 
-  function Bin(w, h, splitMode) {
+  function Bin(w, h, splitMode, allowance) {
     this.w = w; this.h = h;
+    this.allowance = allowance || 0;
     this.splitMode = splitMode; // 'H' | 'V' | 'auto'
     this.free = [{ x: 0, y: 0, w: w, h: h }];
     this.placed = [];
     this.cuts = [];
   }
+  // A leftover strip along the sheet's right/top border must be exactly 0 or >= allowance
+  // (thin slivers of ceramic are hard to remove).
+  Bin.prototype.edgeOk = function (f, pw, ph) {
+    var a = this.allowance;
+    if (!(a > 0)) return true;
+    var rw = f.w - pw, rh = f.h - ph;
+    if (Math.abs(f.x + f.w - this.w) < EPS && rw > EPS && rw < a - EPS) return false;
+    if (Math.abs(f.y + f.h - this.h) < EPS && rh > EPS && rh < a - EPS) return false;
+    return true;
+  };
   Bin.prototype.best = function (pw, ph) {
     var best = null;
     for (var i = 0; i < this.free.length; i++) {
       var f = this.free[i];
-      if (pw <= f.w + EPS && ph <= f.h + EPS) {
+      if (pw <= f.w + EPS && ph <= f.h + EPS && this.edgeOk(f, pw, ph)) {
         var s1 = Math.min(f.w - pw, f.h - ph);
         var s2 = Math.max(f.w - pw, f.h - ph);
         if (!best || s1 < best.s1 - EPS || (Math.abs(s1 - best.s1) <= EPS && s2 < best.s2)) best = { s1: s1, s2: s2, i: i };
@@ -47,22 +58,22 @@
     return true;
   };
 
-  function run(stockW, stockH, pieces, allowRotate, sortFn, splitMode) {
+  function run(stockW, stockH, pieces, allowRotate, sortFn, splitMode, allowance) {
     var list = pieces.slice().sort(sortFn);
     var bins = [];
     for (var n = 0; n < list.length; n++) {
       var p = list[n], ok = false;
       for (var j = 0; j < bins.length; j++) if (bins[j].tryPlace(p, allowRotate)) { ok = true; break; }
       if (!ok) {
-        var b = new Bin(stockW, stockH, splitMode);
-        if (!b.tryPlace(p, allowRotate)) throw new Error('Piece ' + p.w + ' x ' + p.h + ' does not fit on the stock tile.');
+        var b = new Bin(stockW, stockH, splitMode, allowance);
+        if (!b.tryPlace(p, allowRotate)) throw new Error('Piece ' + p.w + ' x ' + p.h + ' does not fit on the stock tile' + (allowance > 0 ? ' with the allowance of ' + allowance + ' mm.' : '.'));
         bins.push(b);
       }
     }
     return bins;
   }
 
-  function nest(stockW, stockH, pieces, allowRotate) {
+  function nest(stockW, stockH, pieces, allowRotate, allowance) {
     var sorts = [
       function (a, b) { return b.w * b.h - a.w * a.h; },
       function (a, b) { return Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h; },
@@ -73,7 +84,7 @@
     var modes = ['auto', 'H', 'V'];
     var best = null, bestLast = 0;
     for (var s = 0; s < sorts.length; s++) for (var m = 0; m < modes.length; m++) {
-      var bins = run(stockW, stockH, pieces, allowRotate, sorts[s], modes[m]);
+      var bins = run(stockW, stockH, pieces, allowRotate, sorts[s], modes[m], allowance);
       var last = 0, lb = bins[bins.length - 1].placed;
       for (var k = 0; k < lb.length; k++) last += lb[k].w * lb[k].h;
       if (!best || bins.length < best.length || (bins.length === best.length && last < bestLast)) { best = bins; bestLast = last; }

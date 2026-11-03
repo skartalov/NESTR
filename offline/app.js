@@ -44,7 +44,9 @@
     }
     if (!pieces.length) throw new Error('Add at least one piece.');
     if (pieces.length > 5000) throw new Error('Too many pieces (max 5000).');
-    return { sw: sw, sh: sh, pieces: pieces, allowRotate: !$('respectDir').checked };
+    var allowance = parseFloat($('allowance').value) || 0;
+    if (allowance < 0) throw new Error('Allowance cannot be negative.');
+    return { sw: sw, sh: sh, pieces: pieces, allowRotate: !$('respectDir').checked, allowance: allowance };
   }
 
   function svgHtml(sheet) {
@@ -114,7 +116,7 @@
     $('error').innerHTML = '';
     try {
       var inp = readInput();
-      sheets = Nestr.nest(inp.sw, inp.sh, inp.pieces, inp.allowRotate);
+      sheets = Nestr.nest(inp.sw, inp.sh, inp.pieces, inp.allowRotate, inp.allowance);
       render(inp.sw, inp.sh, inp.pieces);
     } catch (e) {
       $('error').appendChild(document.createTextNode(e.message));
@@ -170,7 +172,7 @@
 
   // Remember stock size and the two checkboxes. localStorage first (cookies are
   // often not kept for file:// pages), cookie as a fallback.
-  var SAVED = ['stockW', 'stockH',   'respectDir', 'sameDir', 'feed'];
+  var SAVED = ['stockW', 'stockH',   'respectDir', 'sameDir', 'feed', 'allowance'];
   function loadSettings() {
     var data = null;
     try { data = JSON.parse(localStorage.getItem('nestr_settings')); } catch (e) {}

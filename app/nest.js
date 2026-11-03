@@ -5,17 +5,28 @@
   const EPS = 1e-6;
 
   class Bin {
-    constructor(w, h, splitMode) {
+    constructor(w, h, splitMode, allowance) {
       this.w = w; this.h = h;
+      this.allowance = allowance || 0;
       this.splitMode = splitMode; // 'H' | 'V' | 'auto'
       this.free = [{ x: 0, y: 0, w, h }];
       this.placed = [];
       this.cuts = []; // {x1,y1,x2,y2}
     }
+    // A leftover strip along the sheet's right/top border must be exactly 0 or >= allowance
+    // (thin slivers of ceramic are hard to remove).
+    edgeOk(f, pw, ph) {
+      const a = this.allowance;
+      if (!(a > 0)) return true;
+      const rw = f.w - pw, rh = f.h - ph;
+      if (Math.abs(f.x + f.w - this.w) < EPS && rw > EPS && rw < a - EPS) return false;
+      if (Math.abs(f.y + f.h - this.h) < EPS && rh > EPS && rh < a - EPS) return false;
+      return true;
+    }
     best(pw, ph) {
       let best = null;
       this.free.forEach((f, i) => {
-        if (pw <= f.w + EPS && ph <= f.h + EPS) {
+        if (pw <= f.w + EPS && ph <= f.h + EPS && this.edgeOk(f, pw, ph)) {
           const s1 = Math.min(f.w - pw, f.h - ph);
           const s2 = Math.max(f.w - pw, f.h - ph);
           if (!best || s1 < best.s1 - EPS || (Math.abs(s1 - best.s1) <= EPS && s2 < best.s2)) best = { s1, s2, i };
@@ -50,15 +61,15 @@
     }
   }
 
-  function run(stockW, stockH, pieces, allowRotate, sortFn, splitMode) {
+  function run(stockW, stockH, pieces, allowRotate, sortFn, splitMode, allowance) {
     const list = pieces.slice().sort(sortFn);
     const bins = [];
     for (const p of list) {
       let ok = false;
       for (const b of bins) if (b.tryPlace(p, allowRotate)) { ok = true; break; }
       if (!ok) {
-        const b = new Bin(stockW, stockH, splitMode);
-        if (!b.tryPlace(p, allowRotate)) throw new Error('Piece ' + p.w + ' x ' + p.h + ' does not fit on the stock tile.');
+        const b = new Bin(stockW, stockH, splitMode, allowance);
+        if (!b.tryPlace(p, allowRotate)) throw new Error('Piece ' + p.w + ' x ' + p.h + ' does not fit on the stock tile' + (allowance > 0 ? ' with the allowance of ' + allowance + ' mm.' : '.'));
         bins.push(b);
       }
     }
@@ -67,7 +78,7 @@
 
   // pieces: [{w,h}] already expanded by quantity.
   // Returns [{w,h,placed:[{x,y,w,h,rotated}],cuts:[{x1,y1,x2,y2}]}]
-  function nest(stockW, stockH, pieces, allowRotate) {
+  function nest(stockW, stockH, pieces, allowRotate, allowance) {
     const sorts = [
       (a, b) => b.w * b.h - a.w * a.h,
       (a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h,
@@ -77,7 +88,7 @@
     ];
     let best = null, bestLast = 0;
     for (const s of sorts) for (const m of ['auto', 'H', 'V']) {
-      const bins = run(stockW, stockH, pieces, allowRotate, s, m);
+      const bins = run(stockW, stockH, pieces, allowRotate, s, m, allowance);
       // fewer sheets first; then emptier last sheet (bigger reusable offcut)
       const last = bins[bins.length - 1].placed.reduce((t, p) => t + p.w * p.h, 0);
       if (!best || bins.length < best.length || (bins.length === best.length && last < bestLast)) { best = bins; bestLast = last; }

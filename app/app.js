@@ -37,7 +37,9 @@
     });
     if (!pieces.length) throw new Error('Add at least one piece.');
     if (pieces.length > 5000) throw new Error('Too many pieces (max 5000).');
-    return { sw, sh, pieces, allowRotate: !$('respectDir').checked };
+    const allowance = parseFloat($('allowance').value) || 0;
+    if (allowance < 0) throw new Error('Allowance cannot be negative.');
+    return { sw, sh, pieces, allowRotate: !$('respectDir').checked, allowance };
   }
 
   function svgFor(sheet) {
@@ -99,8 +101,8 @@
   $('nestBtn').onclick = () => {
     $('error').textContent = '';
     try {
-      const { sw, sh, pieces, allowRotate } = readInput();
-      sheets = Nestr.nest(sw, sh, pieces, allowRotate);
+      const { sw, sh, pieces, allowRotate, allowance } = readInput();
+      sheets = Nestr.nest(sw, sh, pieces, allowRotate, allowance);
       render(sw, sh, pieces);
     } catch (e) {
       $('error').textContent = e.message;
@@ -144,7 +146,7 @@
   });
   $('logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
   // Remember stock size and the two checkboxes in a cookie (1 year)
-  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir', 'feed'];
+  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir', 'feed', 'allowance'];
   try {
     const m = document.cookie.match(/(?:^|;\s*)nestr_settings=([^;]*)/);
     const data = m ? JSON.parse(decodeURIComponent(m[1])) : {};
