@@ -169,6 +169,10 @@
     if (gap < 0) { $('error').innerHTML = 'Gap cannot be negative.'; return; }
     $('error').innerHTML = '';
     var stamp = 'NESTR_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes());
+    // ask for the file name; Enter accepts the suggestion, Cancel aborts
+    var answer = window.prompt('File name for the G-code (_Sheet1, _Sheet2... is added for each sheet):', stamp);
+    if (answer === null) return;
+    stamp = answer.replace(/\.txt$/i, '').replace(/[\\\/:*?"<>|]/g, '_').replace(/^\s+|\s+$/g, '') || stamp;
     // one file per sheet, staggered so the browser accepts multiple downloads
     sheets.forEach(function (s, i) {
       setTimeout(function () {

@@ -137,7 +137,11 @@
     const gap = parseFloat($('gap').value) || 0;
     if (gap < 0) { $('error').textContent = 'Gap cannot be negative.'; return; }
     $('error').textContent = '';
-    const stamp = `NESTR_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    let stamp = `NESTR_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    // ask for the file name; Enter accepts the suggestion, Cancel aborts
+    const answer = window.prompt('File name for the G-code (_Sheet1, _Sheet2... is added for each sheet):', stamp);
+    if (answer === null) return;
+    stamp = answer.replace(/\.txt$/i, '').replace(/[\\/:*?"<>|]/g, '_').trim() || stamp;
     // one file per sheet, staggered so the browser accepts multiple downloads
     sheets.forEach((s, i) => setTimeout(() => {
       const blob = new Blob([Nestr.gcode(s, i, sheets.length, sameDir, feed, gap)], { type: 'text/plain' });
