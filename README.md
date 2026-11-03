@@ -18,7 +18,7 @@ The app is protected by access codes (Node server, no dependencies).
 - Storage: if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, codes are kept in a free Upstash Redis database (survives restarts/redeploys). Otherwise they are kept in `DATA_DIR/codes.json` (default `./data`, git-ignored), which is lost on Render's free tier.
 - On the very first start the administrator code is taken from `ADMIN_CODE` (a random one is printed to the log if unset). After that the stored code is used; changing it in the admin page overrides the variable.
 
-Run locally: `ADMIN_CODE=yourcode node server.js` -> http://localhost:3000
+Run locally (Windows): double-click `start.bat` (asks for the admin code on first run, opens the browser). Or: `ADMIN_CODE=yourcode node server.js` -> http://localhost:3000
 
 ## Deploy (Render)
 New -> **Web Service**, connect this repo, runtime Node, build command `npm install`, start command `node server.js`.
