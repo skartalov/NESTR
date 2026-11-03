@@ -69,8 +69,26 @@
         html += '<text x="' + cx + '" y="' + (cy + dy) + '" font-size="' + nfs + '" text-anchor="middle" dy="0.35em" font-family="Arial" font-style="italic" fill="#7a1f00">' + esc(p.note) + '</text>';
       }
     }
-    return html + '</svg>';
+    return html + cutLines(sheet, sw) + '</svg>';
   }
+
+  // G-code cuts (same paths as the export) drawn as red lines; Y flipped like the tiles
+  function cutLines(sheet, sw) {
+    var gap = parseFloat($('gap').value) || 0;
+    var paths = Nestr.cutPaths(sheet, $('sameDir').checked, gap > 0 ? gap : 0), out = '';
+    for (var i = 0; i < paths.length; i++) {
+      var c = paths[i];
+      out += '<line x1="' + c.x1 + '" y1="' + (sheet.h - c.y1) + '" x2="' + c.x2 + '" y2="' + (sheet.h - c.y2) + '" stroke="#e02020" stroke-width="' + (sw * 1.8) + '" stroke-linecap="round"/>';
+    }
+    return out;
+  }
+
+  var last = null;
+  // redraw when an option that changes the cut paths is edited
+  function addChange(el, fn) { el.addEventListener('change', fn, false); }
+  addChange($('gap'), redraw);
+  addChange($('sameDir'), redraw);
+  function redraw() { if (last && sheets.length) render(last.sw, last.sh, last.pieces); }
 
   function usedArea(s) {
     var t = 0;
@@ -79,6 +97,7 @@
   }
 
   function render(sw, sh, pieces) {
+    last = { sw: sw, sh: sh, pieces: pieces };
     var total = sheets.length, stockArea = sw * sh, used = 0, i, j;
     for (i = 0; i < total; i++) used += usedArea(sheets[i]);
     $('summaryText').innerHTML =

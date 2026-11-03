@@ -62,11 +62,26 @@
         html += `<text x="${cx}" y="${cy + dy}" font-size="${nfs}" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-style="italic" fill="#7a1f00">${esc(p.note)}</text>`;
       }
     }
-    svg.innerHTML = html;
+    svg.innerHTML = html + cutLines(sheet, sw);
     return svg;
   }
 
+  // G-code cuts (same paths as the export) drawn as red lines; Y flipped like the tiles
+  function cutLines(sheet, sw) {
+    const gap = parseFloat($('gap').value) || 0;
+    let out = '';
+    for (const c of Nestr.cutPaths(sheet, $('sameDir').checked, gap > 0 ? gap : 0)) {
+      out += `<line x1="${c.x1}" y1="${sheet.h - c.y1}" x2="${c.x2}" y2="${sheet.h - c.y2}" stroke="#e02020" stroke-width="${sw * 1.8}" stroke-linecap="round"/>`;
+    }
+    return out;
+  }
+
+  let last = null;
+  // redraw when an option that changes the cut paths is edited
+  ['gap', 'sameDir'].forEach(id => $(id).addEventListener('change', () => { if (last && sheets.length) render(last.sw, last.sh, last.pieces); }));
+
   function render(sw, sh, pieces) {
+    last = { sw, sh, pieces };
     const total = sheets.length;
     const stockArea = sw * sh;
     const used = sheets.reduce((t, s) => t + s.placed.reduce((a, p) => a + p.w * p.h, 0), 0);
