@@ -144,7 +144,7 @@
   });
   $('logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
   // Remember stock size and the two checkboxes in a cookie (1 year)
-  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir'];
+  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir', 'feed'];
   try {
     const m = document.cookie.match(/(?:^|;\s*)nestr_settings=([^;]*)/);
     const data = m ? JSON.parse(decodeURIComponent(m[1])) : {};

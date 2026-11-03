@@ -170,7 +170,7 @@
 
   // Remember stock size and the two checkboxes. localStorage first (cookies are
   // often not kept for file:// pages), cookie as a fallback.
-  var SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir'];
+  var SAVED = ['stockW', 'stockH',   'respectDir', 'sameDir', 'feed'];
   function loadSettings() {
     var data = null;
     try { data = JSON.parse(localStorage.getItem('nestr_settings')); } catch (e) {}
