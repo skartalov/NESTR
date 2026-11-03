@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NESTR - Tile Nesting (offline)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="noprint"><h1>NESTR <span>ceramic tile nesting for CNC knife cutting</span></h1></header>
+
+<main>
+<section class="panel noprint">
+  <h2>1. Stock tile</h2>
+  <div class="row">
+    <label>Width (mm) <input id="stockW" type="number" min="1" step="any" value="1200"></label>
+    <label>Height (mm) <input id="stockH" type="number" min="1" step="any" value="3000"></label>
+  </div>
+  <label class="check"><input id="respectDir" type="checkbox"> Respect pattern direction (do not rotate pieces)</label>
+  <p class="hint">If unchecked, pieces may be rotated 90 degrees to save material.</p>
+
+  <h2>2. Pieces to cut</h2>
+  <table id="pieces">
+    <thead><tr><th>Width (mm)</th><th>Height (mm)</th><th>Qty</th><th>Notes</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <button id="addRow" type="button" class="secondary">+ Add piece</button>
+
+  <div class="row">
+    <label>Feedrate (mm/min) <input id="feed" type="number" min="1" step="any" value="10000"></label>
+  </div>
+  <label class="check"><input id="sameDir" type="checkbox"> Same Direction Cuts</label>
+  <p class="hint">G-code cuts always run right to left and top to bottom.</p>
+
+  <div class="actions">
+    <button id="nestBtn" type="button">Nest</button>
+  </div>
+  <div id="error" class="error"></div>
+</section>
+
+<section id="result" class="hidden">
+  <div class="summary panel">
+    <div id="summaryText"></div>
+    <div class="actions noprint">
+      <button id="pdfBtn" type="button" class="secondary">Print / Save as PDF</button>
+      <button id="gcodeBtn" type="button">Export GCODE</button>
+    </div>
+  </div>
+  <div id="sheets"></div>
+</section>
+</main>
+<script src="nest.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
