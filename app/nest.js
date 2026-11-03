@@ -86,7 +86,7 @@
   }
 
   // Cuts ordered by nearest neighbour. Normally each cut is entered from its closer end;
-  // with sameDir every cut runs left to right / bottom to top.
+  // with sameDir every cut runs right to left / top to bottom.
   function cutPaths(sheet, sameDir) {
     // merge collinear cuts that touch or overlap into one continuous line
     const groups = new Map();
@@ -108,7 +108,8 @@
       }
       for (const [a, b] of m) merged.push(g.horiz ? { x1: a, y1: g.pos, x2: b, y2: g.pos } : { x1: g.pos, y1: a, x2: g.pos, y2: b });
     }
-    const segs = merged;
+    // merged segments run left to right / bottom to top; same-direction mode reverses them
+    const segs = sameDir ? merged.map(s => ({ x1: s.x2, y1: s.y2, x2: s.x1, y2: s.y1 })) : merged;
     const out = [];
     let cx = 0, cy = 0;
     while (segs.length) {
@@ -134,7 +135,7 @@
   function gcode(sheet, index, total, sameDir, feed) {
     const L = ['(NESTR)', '(Sheet ' + (index + 1) + ' of ' + total + ' - ' + fmt(sheet.w) + ' x ' + fmt(sheet.h) + ' mm)',
       '(Units mm, absolute positioning, X0 Y0 = bottom-left)'];
-    if (sameDir) L.push('(Same direction cuts: left to right, bottom to top)');
+    if (sameDir) L.push('(Same direction cuts: right to left, top to bottom)');
     L.push('(A axis = direction of the next cut: +X = 0, +Y = 90, -X = 180, -Y = 270)');
     L.push('G21', 'G90', 'M21');
     // head orientation for a cut: angle of its direction vector
