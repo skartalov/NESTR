@@ -133,6 +133,15 @@
   };
 
   $('addRow').onclick = () => addRow();
+  // Enter in a piece field acts like "+ Add piece" and jumps to the new row
+  tbody.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    const last = tbody.lastElementChild;
+    const blank = ['.pw', '.ph', '.pn'].every(s => !last.querySelector(s).value);
+    if (!blank) addRow();
+    tbody.lastElementChild.querySelector('.pw').focus();
+  });
   $('logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
   addRow();
 })();
