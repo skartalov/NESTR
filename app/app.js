@@ -143,5 +143,24 @@
     tbody.lastElementChild.querySelector('.pw').focus();
   });
   $('logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
+  // Remember stock size and the two checkboxes in a cookie (1 year)
+  const SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir'];
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)nestr_settings=([^;]*)/);
+    const data = m ? JSON.parse(decodeURIComponent(m[1])) : {};
+    SAVED.forEach(id => {
+      const el = $(id), v = data[id];
+      if (v === undefined || v === null) return;
+      if (el.type === 'checkbox') el.checked = !!v;
+      else if (parseFloat(v) > 0) el.value = v;
+    });
+  } catch (e) { /* ignore bad cookie */ }
+  const saveSettings = () => {
+    const data = {};
+    SAVED.forEach(id => { const el = $(id); data[id] = el.type === 'checkbox' ? el.checked : el.value; });
+    document.cookie = 'nestr_settings=' + encodeURIComponent(JSON.stringify(data)) + '; max-age=31536000; path=/; SameSite=Lax';
+  };
+  SAVED.forEach(id => { $(id).addEventListener('change', saveSettings); $(id).addEventListener('input', saveSettings); });
+
   addRow();
 })();

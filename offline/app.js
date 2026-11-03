@@ -168,5 +168,39 @@
     q(last, '.pw').focus();
   };
 
+  // Remember stock size and the two checkboxes. localStorage first (cookies are
+  // often not kept for file:// pages), cookie as a fallback.
+  var SAVED = ['stockW', 'stockH', 'respectDir', 'sameDir'];
+  function loadSettings() {
+    var data = null;
+    try { data = JSON.parse(localStorage.getItem('nestr_settings')); } catch (e) {}
+    if (!data) {
+      var m = document.cookie.match(/(?:^|;\s*)nestr_settings=([^;]*)/);
+      if (m) { try { data = JSON.parse(decodeURIComponent(m[1])); } catch (e2) {} }
+    }
+    if (!data) return;
+    for (var i = 0; i < SAVED.length; i++) {
+      var el = $(SAVED[i]), v = data[SAVED[i]];
+      if (v === undefined || v === null) continue;
+      if (el.type === 'checkbox') el.checked = !!v;
+      else if (parseFloat(v) > 0) el.value = v;
+    }
+  }
+  function saveSettings() {
+    var data = {};
+    for (var i = 0; i < SAVED.length; i++) {
+      var el = $(SAVED[i]);
+      data[SAVED[i]] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    var json = JSON.stringify(data);
+    try { localStorage.setItem('nestr_settings', json); } catch (e) {}
+    document.cookie = 'nestr_settings=' + encodeURIComponent(json) + '; max-age=31536000; path=/';
+  }
+  loadSettings();
+  for (var si = 0; si < SAVED.length; si++) {
+    $(SAVED[si]).onchange = saveSettings;
+    if ($(SAVED[si]).type !== 'checkbox') $(SAVED[si]).oninput = saveSettings;
+  }
+
   addRow();
 })();
