@@ -54,8 +54,8 @@
     tryPlace(piece, allowRotate) {
       const a = this.best(piece.w, piece.h);
       const b = allowRotate && piece.w !== piece.h ? this.best(piece.h, piece.w) : null;
-      if (a && (!b || a.s1 < b.s1 - EPS || (Math.abs(a.s1 - b.s1) <= EPS && a.s2 <= b.s2))) this.place(a.i, piece.w, piece.h, false, piece.note);
-      else if (b) this.place(b.i, piece.h, piece.w, true, piece.note);
+      if (a && (!b || a.s1 < b.s1 - EPS || (Math.abs(a.s1 - b.s1) <= EPS && a.s2 <= b.s2))) this.place(a.i, piece.w, piece.h, !!piece.rot, piece.note);
+        else if (b) this.place(b.i, piece.h, piece.w, !piece.rot, piece.note);
       else return false;
       return true;
     }
@@ -150,14 +150,81 @@
     });
   }
 
-  // Sum of squared leftover areas: higher = leftovers are bigger and less fragmented
+  // Real free space of one sheet: cut the sheet into a grid along all piece edges, then
+  // repeatedly take the largest empty rectangle. Returns their areas, biggest first.
+  function freeAreas(bin) {
+    var W = bin.w, H = bin.h, i, j;
+    function key(v) { return Math.round(v * 1e4); }
+    var xv = {}, yv = {};
+    xv[key(0)] = 0; xv[key(W)] = W; yv[key(0)] = 0; yv[key(H)] = H;
+    for (i = 0; i < bin.placed.length; i++) {
+      var p = bin.placed[i];
+      xv[key(p.x)] = p.x; xv[key(p.x + p.w)] = p.x + p.w;
+      yv[key(p.y)] = p.y; yv[key(p.y + p.h)] = p.y + p.h;
+    }
+    var xs = [], ys = [], k;
+    for (k in xv) xs.push(xv[k]);
+    for (k in yv) ys.push(yv[k]);
+    xs.sort(function (a, b) { return a - b; }); ys.sort(function (a, b) { return a - b; });
+    var xi = {}, yi = {};
+    for (i = 0; i < xs.length; i++) xi[key(xs[i])] = i;
+    for (i = 0; i < ys.length; i++) yi[key(ys[i])] = i;
+    var C = xs.length - 1, R = ys.length - 1, free = [];
+    for (i = 0; i < R; i++) { free.push([]); for (j = 0; j < C; j++) free[i].push(true); }
+    for (i = 0; i < bin.placed.length; i++) {
+      var q = bin.placed[i];
+      for (var r = yi[key(q.y)]; r < yi[key(q.y + q.h)]; r++) for (var c = xi[key(q.x)]; c < xi[key(q.x + q.w)]; c++) free[r][c] = false;
+    }
+    var out = [], minArea = 0;
+    for (var it = 0; it < 14; it++) {
+      var hv = [], best = null;
+      for (j = 0; j < C; j++) hv.push(0);
+      var hn = hv.slice();
+      for (i = 0; i < R; i++) {
+        for (j = 0; j < C; j++) {
+          if (free[i][j]) { hv[j] += ys[i + 1] - ys[i]; hn[j]++; } else { hv[j] = 0; hn[j] = 0; }
+        }
+        // largest rectangle in the histogram (weighted column widths)
+        var st = [];
+        for (j = 0; j <= C; j++) {
+          var cur = j < C ? hv[j] : 0, start = j;
+          while (st.length && st[st.length - 1].h >= cur) {
+            var t = st.pop();
+            var area = t.h * (xs[j] - xs[t.s]);
+            if (t.h > 0 && (!best || area > best.area)) best = { area: area, r1: i - hn[t.s] + 1, r2: i, c1: t.s, c2: j - 1 };
+            start = t.s;
+          }
+          st.push({ h: cur, s: start });
+        }
+      }
+      if (!best || best.area < minArea) break;
+      out.push(best.area);
+      for (i = best.r1; i <= best.r2; i++) for (j = best.c1; j <= best.c2; j++) free[i][j] = false;
+    }
+    return out;
+  }
+
+  // Higher = fewer, bigger leftovers (sum of squared areas of the biggest free rectangles)
   function leftoverScore(bins) {
-    var s = 0;
-    for (var i = 0; i < bins.length; i++) for (var j = 0; j < bins[i].free.length; j++) {
-      var f = bins[i].free[j], ar = f.w * f.h;
-      s += ar * ar;
+    var s = 0, i, j, n = 0;
+    for (i = 0; i < bins.length; i++) n += bins[i].placed.length;
+    if (n > 150) { // too big for the exact grid method: use the layout's own free list
+      for (i = 0; i < bins.length; i++) for (j = 0; j < bins[i].free.length; j++) { var f = bins[i].free[j], ar = f.w * f.h; s += ar * ar; }
+      return s;
+    }
+    for (i = 0; i < bins.length; i++) {
+      var a = freeAreas(bins[i]), sq = 0, cnt = 0, sheetArea = bins[i].w * bins[i].h;
+      for (j = 0; j < a.length; j++) { sq += a[j] * a[j]; if (a[j] >= sheetArea * 0.01) cnt++; }
+      // every extra leftover piece (of 1% of the sheet or more) costs 35% of the score
+      s += sq / Math.pow(1.35, Math.max(cnt - 1, 0));
     }
     return s;
+  }
+
+  // small deterministic random generator so the same input always gives the same result
+  function makeRng(seed) {
+    var x = seed >>> 0;
+    return function () { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
   }
 
   // pieces: [{w,h}] already expanded by quantity.
@@ -165,7 +232,7 @@
   // Tries many strategies and keeps the one with the fewest sheets, then the best leftovers.
   // With rotation allowed, the no-rotation layouts are tried too, so allowing rotation
   // can never give a worse result than forbidding it.
-  function nest(stockW, stockH, pieces, allowRotate, allowance) {
+  function nestCore(stockW, stockH, pieces, allowRotate, allowance) {
     allowance = allowance || 0;
     var sorts = [
       function (a, b) { return b.w * b.h - a.w * a.h; },
@@ -196,8 +263,40 @@
         if (t) consider(transposeBins(t, stockW, stockH));
       }
     }
+    // Randomised search: random rotations and orderings, same scoring. Deterministic seed.
+    var n = pieces.length, iters = n <= 150 ? Math.min(300, Math.floor(30000 / Math.max(n, 1))) : 0;
+    if (best && iters > 0) {
+      var rnd = makeRng(12345 + n), keyFns = [
+        function (p) { return p.w * p.h; },
+        function (p) { return Math.max(p.w, p.h); },
+        function (p) { return p.h; },
+        function (p) { return p.w; }
+      ];
+      for (var it = 0; it < iters; it++) {
+        var kf = keyFns[Math.floor(rnd() * keyFns.length)], list = [];
+        for (var pi = 0; pi < n; pi++) {
+          var pc = pieces[pi], flip = allowRotate && rnd() < 0.5 && pc.w !== pc.h;
+          var np = flip ? { w: pc.h, h: pc.w, note: pc.note, rot: true } : { w: pc.w, h: pc.h, note: pc.note, rot: false };
+          np.key = -kf(np) * (1 + (rnd() - 0.5) * 0.6);
+          list.push(np);
+        }
+        try { consider(run(stockW, stockH, list, false, function (a, b) { return a.key - b.key; }, modes[Math.floor(rnd() * 3)], allowance)); }
+        catch (e2) { /* this random orientation does not fit; skip */ }
+      }
+    }
     if (!best) throw firstErr || new Error('Pieces do not fit on the stock tile.');
-    var out = [];
+    return { bins: best, score: bestScore };
+  }
+
+  function nest(stockW, stockH, pieces, allowRotate, allowance) {
+    var res = nestCore(stockW, stockH, pieces, allowRotate, allowance);
+    if (allowRotate) {
+      // rotation must never be worse than "respect direction": compare with that result
+      var alt = null;
+      try { alt = nestCore(stockW, stockH, pieces, false, allowance); } catch (e) { alt = null; }
+      if (alt && (alt.bins.length < res.bins.length || (alt.bins.length === res.bins.length && alt.score > res.score + EPS))) res = alt;
+    }
+    var best = res.bins, out = [];
     for (var i = 0; i < best.length; i++) out.push({ w: best[i].w, h: best[i].h, placed: best[i].placed, cuts: best[i].cuts });
     return out;
   }
