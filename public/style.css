@@ -32,6 +32,7 @@ input.pn { width: 200px; padding: 6px; border: 1px solid #b9c2cf; border-radius:
 .advanced { margin-top: 14px; border: 1px solid #dde2ea; border-radius: 6px; padding: 8px 12px; }
 .advanced summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 .advanced .row { margin-top: 10px; }
+.advanced .rev { margin: 10px 0 0; font-size: 11px; color: #99a; text-align: right; }
 
 @media print {
   body { background: #fff; }
