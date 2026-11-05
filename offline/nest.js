@@ -73,7 +73,95 @@
     return bins;
   }
 
+  // Row (shelf) packing: fills each sheet from the bottom up in full-width rows, so the
+  // leftover is one big rectangle on top instead of scattered strips. Returns null if the
+  // layout is impossible or breaks the border allowance.
+  function shelfRun(W, H, pieces, allowRotate, orient, allowance) {
+    var list = [], i, j, k;
+    for (i = 0; i < pieces.length; i++) {
+      var p = pieces[i], w = p.w, h = p.h, rot = false, t;
+      if (allowRotate && orient !== 'asis' && ((orient === 'tall' && w > h) || (orient === 'wide' && h > w))) { t = w; w = h; h = t; rot = true; }
+      if (!(w <= W + EPS && h <= H + EPS)) {
+        if (allowRotate && h <= W + EPS && w <= H + EPS) { t = w; w = h; h = t; rot = !rot; } else return null;
+      }
+      list.push({ w: w, h: h, rotated: rot, note: p.note });
+    }
+    list.sort(function (a, b) { return b.h - a.h || b.w - a.w; });
+    var bins = [];
+    for (i = 0; i < list.length; i++) {
+      var it = list[i], done = false;
+      for (j = 0; j < bins.length && !done; j++) {
+        var sh = bins[j].shelves;
+        for (k = 0; k < sh.length; k++) {
+          if (it.h <= sh[k].h + EPS && sh[k].x + it.w <= W + EPS) { sh[k].items.push(it); sh[k].x += it.w; done = true; break; }
+        }
+        if (!done && bins[j].y + it.h <= H + EPS) {
+          sh.push({ y: bins[j].y, h: it.h, x: it.w, items: [it] });
+          bins[j].y += it.h; done = true;
+        }
+      }
+      if (!done) bins.push({ y: it.h, shelves: [{ y: 0, h: it.h, x: it.w, items: [it] }] });
+    }
+    var out = [], a = allowance || 0;
+    for (i = 0; i < bins.length; i++) {
+      var placed = [], cuts = [], free = [], ok = true;
+      for (j = 0; j < bins[i].shelves.length; j++) {
+        var s = bins[i].shelves[j], top = s.y + s.h, atTop = H - top < EPS, x = 0;
+        if (!atTop) cuts.push({ x1: 0, y1: top, x2: W, y2: top });
+        for (k = 0; k < s.items.length; k++) {
+          var q = s.items[k], xe = x + q.w;
+          placed.push({ x: x, y: s.y, w: q.w, h: q.h, rotated: q.rotated, note: q.note || '' });
+          if (W - xe > EPS) cuts.push({ x1: xe, y1: s.y, x2: xe, y2: top });
+          if (s.h - q.h > EPS) {
+            cuts.push({ x1: x, y1: s.y + q.h, x2: xe, y2: s.y + q.h });
+            free.push({ x: x, y: s.y + q.h, w: q.w, h: s.h - q.h });
+            if (atTop && s.h - q.h < a - EPS) ok = false;
+          }
+          x = xe;
+        }
+        if (W - s.x > EPS) {
+          free.push({ x: s.x, y: s.y, w: W - s.x, h: s.h });
+          if (W - s.x < a - EPS) ok = false;
+        }
+      }
+      if (H - bins[i].y > EPS) {
+        free.push({ x: 0, y: bins[i].y, w: W, h: H - bins[i].y });
+        if (H - bins[i].y < a - EPS) ok = false;
+      }
+      if (!ok) return null;
+      out.push({ w: W, h: H, placed: placed, cuts: cuts, free: free });
+    }
+    return out;
+  }
+
+  // Same layout with X and Y swapped (columns from the left instead of rows from the bottom)
+  function transposeBins(bins, W, H) {
+    function r(o) { return { x: o.y, y: o.x, w: o.h, h: o.w, rotated: o.rotated, note: o.note }; }
+    return bins.map(function (b) {
+      return {
+        w: W, h: H,
+        placed: b.placed.map(r),
+        free: b.free.map(r),
+        cuts: b.cuts.map(function (c) { return { x1: c.y1, y1: c.x1, x2: c.y2, y2: c.x2 }; })
+      };
+    });
+  }
+
+  // Sum of squared leftover areas: higher = leftovers are bigger and less fragmented
+  function leftoverScore(bins) {
+    var s = 0;
+    for (var i = 0; i < bins.length; i++) for (var j = 0; j < bins[i].free.length; j++) {
+      var f = bins[i].free[j], ar = f.w * f.h;
+      s += ar * ar;
+    }
+    return s;
+  }
+
+  // Tries many strategies and keeps the one with the fewest sheets, then the best leftovers.
+  // With rotation allowed, the no-rotation layouts are tried too, so allowing rotation
+  // can never give a worse result than forbidding it.
   function nest(stockW, stockH, pieces, allowRotate, allowance) {
+    allowance = allowance || 0;
     var sorts = [
       function (a, b) { return b.w * b.h - a.w * a.h; },
       function (a, b) { return Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h; },
@@ -82,13 +170,28 @@
       function (a, b) { return Math.min(b.w, b.h) - Math.min(a.w, a.h) || b.w * b.h - a.w * a.h; }
     ];
     var modes = ['auto', 'H', 'V'];
-    var best = null, bestLast = 0;
-    for (var s = 0; s < sorts.length; s++) for (var m = 0; m < modes.length; m++) {
-      var bins = run(stockW, stockH, pieces, allowRotate, sorts[s], modes[m], allowance);
-      var last = 0, lb = bins[bins.length - 1].placed;
-      for (var k = 0; k < lb.length; k++) last += lb[k].w * lb[k].h;
-      if (!best || bins.length < best.length || (bins.length === best.length && last < bestLast)) { best = bins; bestLast = last; }
+    var best = null, bestScore = 0, firstErr = null;
+    function consider(bins) {
+      if (!bins || !bins.length) return;
+      var sc = leftoverScore(bins);
+      if (!best || bins.length < best.length || (bins.length === best.length && sc > bestScore + EPS)) { best = bins; bestScore = sc; }
     }
+    var rots = allowRotate ? [true, false] : [false];
+    for (var r = 0; r < rots.length; r++) {
+      var rot = rots[r], s, m, o;
+      for (s = 0; s < sorts.length; s++) for (m = 0; m < modes.length; m++) {
+        try { consider(run(stockW, stockH, pieces, rot, sorts[s], modes[m], allowance)); }
+        catch (e) { if (!firstErr) firstErr = e; }
+      }
+      var orients = rot ? ['tall', 'wide'] : ['asis'];
+      var swapped = pieces.map(function (p) { return { w: p.h, h: p.w, note: p.note }; });
+      for (o = 0; o < orients.length; o++) {
+        consider(shelfRun(stockW, stockH, pieces, rot, orients[o], allowance));
+        var t = shelfRun(stockH, stockW, swapped, rot, orients[o], allowance);
+        if (t) consider(transposeBins(t, stockW, stockH));
+      }
+    }
+    if (!best) throw firstErr || new Error('Pieces do not fit on the stock tile.');
     var out = [];
     for (var i = 0; i < best.length; i++) out.push({ w: best[i].w, h: best[i].h, placed: best[i].placed, cuts: best[i].cuts });
     return out;
