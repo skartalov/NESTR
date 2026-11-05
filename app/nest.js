@@ -234,6 +234,38 @@
     return { bins: best, score: bestScore };
   }
 
+  // Drop the parts of a cut that have no piece edge on either side (waste on both sides).
+  function pruneCuts(sheet) {
+    var out = [];
+    for (var i = 0; i < sheet.cuts.length; i++) {
+      var c = sheet.cuts[i], horiz = Math.abs(c.y1 - c.y2) < EPS;
+      var pos = horiz ? c.y1 : c.x1;
+      var a = horiz ? Math.min(c.x1, c.x2) : Math.min(c.y1, c.y2);
+      var b = horiz ? Math.max(c.x1, c.x2) : Math.max(c.y1, c.y2);
+      var pts = [a, b], spans = [];
+      for (var j = 0; j < sheet.placed.length; j++) {
+        var p = sheet.placed[j];
+        var lo = horiz ? p.x : p.y, hi = lo + (horiz ? p.w : p.h);
+        var p0 = horiz ? p.y : p.x, p1 = p0 + (horiz ? p.h : p.w);
+        if (Math.abs(p0 - pos) < EPS || Math.abs(p1 - pos) < EPS) {
+          spans.push([lo, hi]);
+          if (lo > a + EPS && lo < b - EPS) pts.push(lo);
+          if (hi > a + EPS && hi < b - EPS) pts.push(hi);
+        }
+      }
+      pts.sort(function (x, y) { return x - y; });
+      for (var k = 0; k + 1 < pts.length; k++) {
+        var s = pts[k], e = pts[k + 1];
+        if (e - s < EPS) continue;
+        var mid = (s + e) / 2, used = false;
+        for (var q = 0; q < spans.length; q++) if (mid > spans[q][0] && mid < spans[q][1]) { used = true; break; }
+        if (!used) continue;
+        out.push(horiz ? { x1: s, y1: pos, x2: e, y2: pos } : { x1: pos, y1: s, x2: pos, y2: e });
+      }
+    }
+    return out;
+  }
+
   function nest(stockW, stockH, pieces, allowRotate, allowance) {
     var res = nestCore(stockW, stockH, pieces, allowRotate, allowance);
     if (allowRotate) {
@@ -254,7 +286,7 @@
         } catch (e3) { /* keep the original sheet */ }
       }
     }
-    for (var i = 0; i < best.length; i++) out.push({ w: best[i].w, h: best[i].h, placed: best[i].placed, cuts: best[i].cuts, free: best[i].free });
+    for (var i = 0; i < best.length; i++) out.push({ w: best[i].w, h: best[i].h, placed: best[i].placed, cuts: pruneCuts(best[i]), free: best[i].free });
     return out;
   }
 
