@@ -242,7 +242,18 @@
       try { alt = nestCore(stockW, stockH, pieces, false, allowance); } catch (e) { alt = null; }
       if (alt && (alt.bins.length < res.bins.length || (alt.bins.length === res.bins.length && alt.score > res.score + EPS))) res = alt;
     }
-    var best = res.bins, out = [];
+    var best = res.bins.slice(), out = [];
+    // re-pack each sheet's own pieces alone: the sheet split found above may hide a better single-sheet layout
+    if (best.length > 1) {
+      for (var bi = 0; bi < best.length; bi++) {
+        var own = best[bi].placed.map(function (p) { return p.rotated ? { w: p.h, h: p.w, note: p.note } : { w: p.w, h: p.h, note: p.note }; });
+        if (own.length < 2) continue;
+        try {
+          var rp = nestCore(stockW, stockH, own, allowRotate, allowance);
+          if (rp.bins.length === 1 && rp.score > leftoverScore([best[bi]]) + EPS) best[bi] = rp.bins[0];
+        } catch (e3) { /* keep the original sheet */ }
+      }
+    }
     for (var i = 0; i < best.length; i++) out.push({ w: best[i].w, h: best[i].h, placed: best[i].placed, cuts: best[i].cuts, free: best[i].free });
     return out;
   }
