@@ -147,7 +147,10 @@ async function handle(req, res) {
     if (code && code.length <= 200) {
       if (matches(code, db.admin)) { fails.delete(k); newSession(res, 'admin', null, secure); return json(res, 200, { next: '/admin/' }); }
       const hit = db.codes.find(c => matches(code, c));
-      if (hit) { fails.delete(k); newSession(res, 'user', hit.id, secure); return json(res, 200, { next: '/app/' }); }
+      if (hit) {
+        hit.lastSeen = new Date().toISOString();
+        try { await save(); } catch (e) { console.error('Could not save last seen:', e.message); }
+        fails.delete(k); newSession(res, 'user', hit.id, secure); return json(res, 200, { next: '/app/' }); }
     }
     fail(k);
     return json(res, 401, { error: 'Invalid access code' });
@@ -173,7 +176,7 @@ async function handle(req, res) {
   if (p.startsWith('/admin/')) return serveFile(res, ADM, p === '/admin/' ? 'admin.html' : p.slice(7));
 
   if (p === '/api/admin/codes' && req.method === 'GET') {
-    return json(res, 200, db.codes.map(c => ({ id: c.id, label: c.label, created: c.created })));
+    return json(res, 200, db.codes.map(c => ({ id: c.id, label: c.label, created: c.created, lastSeen: c.lastSeen || null })));
   }
   if (p === '/api/admin/codes' && req.method === 'POST') {
     let b; try { b = await readJson(req); } catch (e) { return json(res, 400, { error: 'Bad request' }); }

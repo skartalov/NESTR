@@ -30,7 +30,9 @@
         refresh();
       };
       a.appendChild(b);
-      tr.append(n, d, a);
+      const s = document.createElement('td');
+      s.textContent = c.lastSeen ? new Date(c.lastSeen).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Never';
+      tr.append(n, d, a, s);
       tb.appendChild(tr);
     });
     $('empty').style.display = list.length ? 'none' : '';
